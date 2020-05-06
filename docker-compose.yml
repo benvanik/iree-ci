@@ -1,0 +1,74 @@
+version: "3.7"
+
+configs:
+  base-config:
+    file: ./base-config
+
+secrets:
+  github-secrets:
+    file: ./github-secrets
+
+networks:
+  internal:
+  public:
+
+volumes:
+  build-storage:
+  grafana-storage:
+
+services:
+
+    # tmpfs:
+    #   - /tmp
+    # environment:
+    #   - FOO=bar
+    # depends_on:
+    #   - ccache_memcached
+
+  buildcache-redis:
+    image: redis:latest
+    networks:
+      - internal
+    ports:
+      - 6379:6379
+    volumes:
+      - type: volume
+        source: build-storage
+        target: /data
+
+  # https://github.com/kwk/distcc-docker-images
+  # https://github.com/distcc/distcc/tree/master/docker
+  # https://tomlankhorst.nl/distcc-docker-service/
+  distcc-host-linux-clang-10:
+    image: iree-ci/distcc-host-linux-clang-10
+    networks:
+      - internal
+      - public
+    ports:
+      - 27100:27100
+      - 27101:27101
+    environment:
+      - DISTCC_OPS_PORT=27100
+      - DISTCC_STATS_PORT=27101
+
+  build-host-linux-clang-10:
+    image: iree-ci/build-host-linux-clang-10
+    networks:
+      - internal
+      - public
+    depends_on:
+      - buildcache-redis
+      - distcc-host-linux-clang-10
+
+  # https://hub.docker.com/r/grafana/grafana
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   networks:
+  #     - internal
+  #     - public
+  #   ports:
+  #     - 3000:3000
+  #   volumes:
+  #     - type: volume
+  #       source: grafana-storage
+  #       target: /var/lib/grafana
